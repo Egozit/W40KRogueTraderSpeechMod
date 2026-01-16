@@ -6,6 +6,7 @@ using SpeechMod.Unity.Extensions;
 using SpeechMod.Voice;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using TMPro;
@@ -23,6 +24,10 @@ public static class Main
     public static Settings Settings;
     public static bool Enabled;
     public static string[] FontStyleNames = Enum.GetNames(typeof(FontStyles));
+    
+    // File logging
+    private static string _logFilePath;
+    private static readonly object _logFileLock = new object();
 
     public static string NarratorVoice => VoicesDict?.ElementAtOrDefault(Settings.NarratorVoice).Key;
     public static string FemaleVoice => VoicesDict?.ElementAtOrDefault(Settings.FemaleVoice).Key;
@@ -38,18 +43,90 @@ public static class Main
     }).ToDictionary(p => p.Key, p => p.Value);
 
     public static ISpeech Speech;
+    public static IAudioFileLoader AudioFileLoader;
+    public static AudioFilePlayerUnity AudioFilePlayer;
+    public static string CurrentLanguage = "ruRU";
     private static bool m_Loaded = false;
+
+    /// <summary>
+    /// Initialize file logging to the mod folder
+    /// </summary>
+    private static void InitializeFileLogging()
+    {
+        try
+        {
+            // Log to mod folder: AppData\LocalLow\Owlcat Games\...\UnityModManager\W40KSpeechMod\SpeechMod.log
+            var modFolder = Path.Combine(Application.persistentDataPath, "UnityModManager", "W40KSpeechMod");
+            Directory.CreateDirectory(modFolder);
+            _logFilePath = Path.Combine(modFolder, "SpeechMod.log");
+            
+            // Clear old log file if it's too large (> 5MB)
+            if (File.Exists(_logFilePath) && new FileInfo(_logFilePath).Length > 5242880)
+            {
+                File.Delete(_logFilePath);
+            }
+            
+            FileLog($"========== SpeechMod Log Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==========");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SpeechMod] Failed to initialize file logging: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Write a message to the log file (public for use by other classes)
+    /// </summary>
+    public static void FileLog(string message)
+    {
+        if (string.IsNullOrEmpty(_logFilePath))
+            return;
+
+        try
+        {
+            lock (_logFileLock)
+            {
+                var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+                var logMessage = $"[{timestamp}] {message}";
+                File.AppendAllText(_logFilePath, logMessage + Environment.NewLine);
+            }
+        }
+        catch { /* Silently fail if file logging has issues */ }
+    }
 
     private static bool Load(UnityModManager.ModEntry modEntry)
     {
         Debug.Log("Warhammer 40K: Rogue Trader Speech Mod Initializing...");
+        
+        InitializeFileLogging();
+        FileLog("Load() called");
 
         Logger = modEntry?.Logger;
 
+        Settings = UnityModManager.ModSettings.Load<Settings>(modEntry);
+        var msg1 = $"Settings loaded - Language={Settings?.CurrentLanguage}";
+        Logger?.Log(msg1);
+        FileLog(msg1);
+        
+        CurrentLanguage = Settings?.CurrentLanguage ?? "ruRU";
+
+        // Initialize audio file loader (always available for fallback)
+        AudioFileLoader = new LocalizationAudioFileLoader(CurrentLanguage);
+        var msg2 = $"[Main] Audio file loader initialized for language: {CurrentLanguage}";
+        Logger?.Log(msg2);
+        FileLog(msg2);
+
+        // Initialize audio file player for playback
+        var audioGameObject = new GameObject("AudioFilePlayer");
+        AudioFilePlayer = audioGameObject.AddComponent<AudioFilePlayerUnity>();
+        var msg2b = "[Main] Audio file player initialized";
+        Logger?.Log(msg2b);
+        FileLog(msg2b);
+
+        // Initialize TTS engine (WindowsSpeech or AppleSpeech)
         if (!SetSpeech())
             return false;
 
-        Settings = UnityModManager.ModSettings.Load<Settings>(modEntry);
         Hooks.UpdateHoverColor();
 
         modEntry!.OnToggle = OnToggle;
@@ -65,12 +142,14 @@ public static class Main
 
         Logger?.Log(Speech?.GetStatusMessage());
 
+        // Set up voices for TTS
         if (!SetAvailableVoices())
             return false;
 
         PhoneticDictionary.LoadDictionary();
 
         Debug.Log("Warhammer 40K: Rogue Trader Speech Mod Initialized!");
+
         m_Loaded = true;
         return true;
     }
@@ -133,13 +212,17 @@ public static class Main
 
     private static bool SetSpeech()
     {
+        Logger?.Log("[SetSpeech] Initializing TTS engine");
+        
         switch (Application.platform)
         {
             case RuntimePlatform.OSXPlayer:
+                Logger?.Log("[SetSpeech] Platform: macOS");
                 Speech = new AppleSpeech();
                 SpeechExtensions.AddUiElements<AppleVoiceUnity>(Constants.APPLE_VOICE_NAME);
                 break;
             case RuntimePlatform.WindowsPlayer:
+                Logger?.Log("[SetSpeech] Platform: Windows");
                 Speech = new WindowsSpeech();
                 SpeechExtensions.AddUiElements<WindowsVoiceUnity>(Constants.WINDOWS_VOICE_NAME);
                 break;

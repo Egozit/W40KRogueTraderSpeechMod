@@ -4,7 +4,11 @@ namespace SpeechMod;
 
 public class Settings : UnityModManager.ModSettings
 {
-    public bool LogVoicedLines = false;
+    // Audio playback mode
+    public bool UseAudioFiles = true;
+    public string CurrentLanguage = "ruRU";
+
+    public bool LogVoicedLines = true;
 
     public string[] AvailableVoices;
 

@@ -31,7 +31,7 @@ public class AppleSpeech : ISpeech
 		AppleVoiceUnity.Speak(text);
 	}
 
-	public void SpeakDialog(string text, float delay = 0f)
+	public void SpeakDialog(string text, float delay = 0f, string dialogueId = null)
 	{
 		if (string.IsNullOrEmpty(text))
 		{
@@ -49,12 +49,12 @@ public class AppleSpeech : ISpeech
 		AppleVoiceUnity.SpeakDialog(text, delay);
 	}
 
-	public void SpeakAs(string text, VoiceType type, float delay = 0)
+	public void SpeakAs(string text, VoiceType type, float delay = 0, string dialogueId = null)
 	{
 		throw new NotImplementedException();
 	}
 
-	public void Speak(string text, float delay)
+	public void Speak(string text, float delay, string dialogueId = null)
 	{
 		if (string.IsNullOrEmpty(text))
 		{

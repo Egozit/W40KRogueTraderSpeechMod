@@ -136,7 +136,7 @@ public class WindowsSpeech : ISpeech
         return text;
     }
 
-    public void SpeakDialog(string text, float delay = 0f)
+    public void SpeakDialog(string text, float delay = 0f, string dialogueId = null)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -155,7 +155,7 @@ public class WindowsSpeech : ISpeech
         SpeakInternal(text, delay);
     }
 
-    public void SpeakAs(string text, VoiceType voiceType, float delay = 0f)
+    public void SpeakAs(string text, VoiceType voiceType, float delay = 0f, string dialogueId = null)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -187,7 +187,7 @@ public class WindowsSpeech : ISpeech
         SpeakInternal(text, delay);
     }
 
-    public void Speak(string text, float delay = 0f)
+    public void Speak(string text, float delay = 0f, string dialogueId = null)
     {
         if (string.IsNullOrEmpty(text))
         {
